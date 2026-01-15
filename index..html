@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>McDonald's – Gestion Heures</title>
+
+<style>
+body{
+  font-family:'Segoe UI',Arial;
+  background:#f1f3f5;
+  margin:0;
+  padding:20px;
+}
+.container{
+  max-width:1000px;
+  margin:auto;
+}
+.header{
+  background:#da291c;
+  color:white;
+  padding:15px;
+  border-radius:16px;
+  text-align:center;
+  font-size:22px;
+  font-weight:bold;
+}
+.card{
+  background:white;
+  border-radius:16px;
+  padding:20px;
+  margin-top:15px;
+  box-shadow:0 6px 16px rgba(0,0,0,0.1);
+}
+input{
+  padding:10px;
+  border-radius:10px;
+  border:1px solid #ccc;
+  width:60%;
+}
+button{
+  padding:8px 14px;
+  border:none;
+  border-radius:10px;
+  margin:3px;
+  cursor:pointer;
+  font-weight:600;
+}
+.add{background:#198754;color:white;}
+.start{background:#0d6efd;color:white;}
+.pause{background:#ffc107;}
+.stop{background:#dc3545;color:white;}
+.delete{background:#6c757d;color:white;}
+
+.worker{
+  border-left:8px solid #198754;
+  margin-top:12px;
+}
+.worker.yellow{border-color:#ffc107;}
+.worker.red{border-color:#dc3545;}
+
+.name{
+  font-size:18px;
+  font-weight:bold;
+}
+.time{
+  font-size:32px;
+  margin:6px 0;
+}
+.status{
+  font-weight:bold;
+}
+.anomaly{
+  background:#dc3545;
+  color:white;
+  padding:6px;
+  border-radius:8px;
+  margin-top:6px;
+}
+.topbar{
+  background:#da291c;
+  color:white;
+  display:flex;
+  align-items:center;
+  padding:15px;
+  border-radius:18px;
+  margin-bottom:15px;
+}
+.logo{
+  height:50px;
+  margin-right:15px;
+}
+.title{
+  font-size:22px;
+  font-weight:bold;
+}
+</style>
+</head>
+
+<body>
+<div class="topbar">
+  <img src="logo..png" class="logo">
+  <div class="title">McDonald's Meknès – Time Management</div>
+</div>
+<div class="container">
+  <div class="header">McDonald's Meknès – Gestion du Temps</div>
+
+  <div class="card">
+    <input id="name" placeholder="Nom de l’employé">
+    <button class="add" onclick="addWorker()">➕ Ajouter</button>
+  </div>
+
+  <div id="list"></div>
+</div>
+
+<audio id="alarm">
+  <source src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg">
+</audio>
+
+<script>
+let workers = JSON.parse(localStorage.getItem("workers")) || [];
+function save(){localStorage.setItem("workers",JSON.stringify(workers));}
+
+function addWorker(){
+  let n=document.getElementById("name").value;
+  if(!n)return;
+  workers.push({name:n,sec:0,timer:null,anomaly:"",alarm:false});
+  document.getElementById("name").value="";
+  save();render();
+}
+
+function start(i){
+  if(workers[i].timer)return;
+  workers[i].timer=setInterval(()=>{
+    workers[i].sec++;
+    rules(i);
+    save();render();
+  },1000);
+}
+
+function pause(i){
+  let h=workers[i].sec/3600;
+  if(h<2){setAnomaly(i,"Pause avant 2 heures");return;}
+  stop(i);
+  setTimeout(()=>{start(i);alert("Pause terminée");},30*60*1000);
+}
+
+function stop(i){
+  clearInterval(workers[i].timer);
+  workers[i].timer=null;
+}
+
+function removeWorker(i){
+  if(confirm("Supprimer cet employé ?")){
+    stop(i);
+    workers.splice(i,1);
+    save();render();
+  }
+}
+
+function setAnomaly(i,msg){
+  document.getElementById("alarm").play();
+  workers[i].anomaly=msg;
+  alert("Anomalie : "+msg);
+}
+
+function rules(i){
+  let h=workers[i].sec/3600;
+  if(h>=4.5 && !workers[i].alarm){
+    document.getElementById("alarm").play();
+    workers[i].alarm=true;
+  }
+  if(h>=5){setAnomaly(i,"Plus de 5h consécutives");stop(i);}
+  if(h>=10){setAnomaly(i,"Plus de 10h/jour");stop(i);}
+}
+
+function fmt(s){
+  let h=Math.floor(s/3600);
+  let m=Math.floor((s%3600)/60);
+  let sc=s%60;
+  return `${h.toString().padStart(2,"0")}:${m.toString().padStart(2,"0")}:${sc.toString().padStart(2,"0")}`;
+}
+
+function render(){
+  let html="";
+  workers.forEach((w,i)=>{
+    let h=w.sec/3600;
+    let cls="worker";
+    let status="En travail";
+    if(h>=5){cls+=" red";status="STOP";}
+    else if(h>=2){cls+=" yellow";status="Pause autorisée";}
+
+    html+=`
+    <div class="card ${cls}">
+      <div class="name">${w.name}</div>
+      <div class="time">${fmt(w.sec)}</div>
+      <div class="status">${status}</div>
+      ${w.anomaly?`<div class="anomaly">${w.anomaly}</div>`:""}
+      <button class="start" onclick="start(${i})">Start</button>
+      <button class="pause" onclick="pause(${i})">Pause</button>
+      <button class="stop" onclick="stop(${i})">Stop</button>
+      <button class="delete" onclick="removeWorker(${i})">Supprimer</button>
+    </div>`;
+  });
+  document.getElementById("list").innerHTML=html;
+}
+render();
+</script>
+</body>
+</html>
+<button onclick="generateReport()">📄 Export PDF</button>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+function generateReport(){
+  const { jsPDF } = window.jspdf;
+  let pdf = new jsPDF();
+  pdf.text("McDonald's Meknès – Rapport Journalier", 10, 10);
+
+  let y = 20;
+  workers.forEach(w=>{
+    pdf.text(`Nom: ${w.name}`,10,y); y+=6;
+    pdf.text(`Heures: ${fmt(w.sec)}`,10,y); y+=6;
+    if(w.anomaly){
+      pdf.text(`Anomalie: ${w.anomaly}`,10,y); y+=6;
+    }
+    y+=4;
+  });
+
+  pdf.save("rapport_mcdonalds.pdf");
+}
+</script>
